@@ -1,3 +1,6 @@
 *.prefs
 Tirusse_hw/Tirusse/#auto_saved_files#
 Tirusse_hw/Tirusse/Tirusse-backups/
+Tirusse_hw/Tirusse-backups/
+*.ses
+Tirusse_hw/Tools/.idea/
