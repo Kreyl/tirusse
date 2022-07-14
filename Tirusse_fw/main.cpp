@@ -58,7 +58,7 @@ static void EnterSleepNow();
 static void EnterSleep();
 
 // ==== Timers ====
-static TmrKL_t TmrAcg {TIME_MS2I(450), evtIdAcc, tktPeriodic};
+//static TmrKL_t TmrAcg {TIME_MS2I(450), evtIdAcc, tktPeriodic};
 #endif
 
 int main(void) {
@@ -116,10 +116,10 @@ int main(void) {
     // LED pwr pin
     PinSetupOut(NPX_PWR_PIN, omPushPull);
     LedPwrOn();
-    Leds.SetAll(clGreen);
-    Leds.SetCurrentColors();
-/*
-    // Init filesystem
+//    Leds.SetAll(clGreen);
+//    Leds.SetCurrentColors();
+
+/*    // Init filesystem
     FRESULT err;
     err = f_mount(&FlashFS, "", 0);
     if(err == FR_OK) {
@@ -128,11 +128,9 @@ int main(void) {
         else Lumos.StartOrRestart(lsqLError);
     }
     else Printf("FS error\r");
+    */
 
     Eff::Init();
-    Motion::Init();
-    Acg.Init();
-    TmrAcg.StartOrRestart();
 
     UsbMsd.Init();
     SimpleSensors::Init();
@@ -142,12 +140,11 @@ int main(void) {
     PinSetHi(BAT_MEAS_EN); // Enable it forever, as 200k produces ignorable current
 
     // Inner ADC
-    Adc.Init(AdcSetup);
-    Adc.StartPeriodicMeasurement(1);
+//    Adc.Init(AdcSetup);
+//    Adc.StartPeriodicMeasurement(1);
 //    PinSetupAnalog(ADC_BAT_PIN);
-*/
 
-    TmrAcg.StartOrRestart();
+
     // Main cycle
     ITask();
 }
@@ -254,13 +251,28 @@ void OnCmd(Shell_t *PShell) {
     }
     else if(PCmd->NameIs("Version")) PShell->Print("%S %S\r", APP_NAME, XSTRINGIFY(BUILD_TIME));
 
-    else if(PCmd->NameIs("Set")) {
-        int R, A;
+    else if(PCmd->NameIs("SetGem")) {
         Color_t Clr;
-        if(PCmd->GetNext<int>(&R) != retvOk) { PShell->BadParam(); return; }
-        if(PCmd->GetNext<int>(&A) != retvOk) { PShell->BadParam(); return; }
+        uint32_t Smooth;
         if(PCmd->GetClrRGB(&Clr) != retvOk) { PShell->BadParam(); return; }
-        Eff::Set(R, A, Clr);
+        if(PCmd->GetNext<uint32_t>(&Smooth) != retvOk) Smooth = 0;
+        Eff::SetGem(Clr, Smooth);
+        PShell->Ok();
+    }
+
+    else if(PCmd->NameIs("SetBlade")) {
+        Color_t Clr;
+        uint32_t Smooth;
+        if(PCmd->GetClrRGB(&Clr) != retvOk) { PShell->BadParam(); return; }
+        if(PCmd->GetNext<uint32_t>(&Smooth) != retvOk) Smooth = 0;
+        Eff::SetBlade(Clr, Smooth);
+        PShell->Ok();
+    }
+
+    else if(PCmd->NameIs("Set")) {
+        Color_t Clr;
+        if(PCmd->GetClrRGB(&Clr) != retvOk) { PShell->BadParam(); return; }
+        Leds.SetAll(Clr);
         Leds.SetCurrentColors();
         PShell->Ok();
     }

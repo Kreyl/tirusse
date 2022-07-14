@@ -12,6 +12,7 @@
 namespace Eff {
 void Init();
 
-void Set(int R, int A, Color_t AClr);
+void SetGem(Color_t Clr, uint32_t ASmooth);
+void SetBlade(Color_t Clr, uint32_t ASmooth);
 
 }
