@@ -112,6 +112,7 @@ public:
 class rLevel1_t {
 private:
     RxTable_t RxTable1, RxTable2, *RxTableW = &RxTable1;
+    bool Enabled = true;
 public:
     uint8_t TxPower;
 
@@ -134,6 +135,7 @@ public:
     }
 
     uint8_t Init();
+    void Stop();
 
     // Inner use
     void ITask();

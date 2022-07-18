@@ -14,9 +14,9 @@
 #include "kl_fs_utils.h"
 #include "usb_msd.h"
 #include "Settings.h"
-#include "Motion.h"
 #include "adcL476.h"
 #include "radio_lvl1.h"
+#include "buttons.h"
 
 #if 1 // ======================== Variables and defines ========================
 // Forever
@@ -45,6 +45,7 @@ bool UsbIsConnected = false;
 // ==== ADC ====
 #define BATTERY_DEAD_mv 3300
 void OnAdcDoneI();
+static uint32_t Battery_mV = 0;
 
 const AdcSetup_t AdcSetup = {
         .SampleTime = ast92d5Cycles,
@@ -71,7 +72,7 @@ static void EnterSleep();
 #define TYPE_CNT                4
 
 #define SMOOTH_VALUE            4500
-#define CLR_INDI                Color_t(0, 0, 54)
+#define CLR_INDI                Color_t(0, 0, 108)
 
 static TmrKL_t TmrCheckRxTable {TIME_MS2I(1800), evtIdCheckRxTable, tktPeriodic};
 
@@ -88,6 +89,23 @@ void CheckRxTable() {
 #endif
 
 int main(void) {
+#if 1 // ==== Get source of wakeup ====
+    rccEnablePWRInterface(FALSE);
+    if(Sleep::WokeUpByWKUP2()) { // Wakeup by button occured
+        // Wait longpress
+        PinSetupInput(BTN_PIN, pudPullDown);
+        for(uint32_t i=0; i<540000; i++) {
+            // Go sleep if btn released too fast
+            if(PinIsLo(BTN_PIN)) EnterSleepNow();
+        }
+        // Btn was keeped in pressed state long enough, proceed with powerOn
+    }
+#endif
+
+    // Start Watchdog. Will reset in main thread by periodic 1 sec events.
+    Iwdg::InitAndStart(4500);
+    Iwdg::DisableInDebug();
+
 #if 1 // ==== Init clock system ====
     Clk.SetVoltageRange(mvrLoPerf);
     Clk.SetupFlashLatency(10, mvrHiPerf);
@@ -133,14 +151,12 @@ int main(void) {
 
     Lumos.Init();
 
-    // ==== Leds ====
+    // Leds
     Leds.Init();
-    // LED pwr pin
-    PinSetupOut(NPX_PWR_PIN, omPushPull);
+    PinSetupOut(NPX_PWR_PIN, omPushPull); // LED pwr pin
 //    LedPwrOn();
 //    Leds.SetAll(clBlue);
 //    Leds.SetCurrentColors();
-
     Eff::Init();
 
 //    UsbMsd.Init();
@@ -167,18 +183,25 @@ void ITask() {
     while(true) {
         EvtMsg_t Msg = EvtQMain.Fetch(TIME_INFINITE);
         switch(Msg.ID) {
-            case evtIdADC: {
+            case evtIdADC:
                 Iwdg::Reload();
-                uint32_t Battery_mV = 2 * Adc.Adc2mV(Msg.Values16[0], Msg.Values16[1]); // *2 because of resistor divider
+                Battery_mV = 2 * Adc.Adc2mV(Msg.Values16[0], Msg.Values16[1]); // *2 because of resistor divider
 //                Printf("VBat: %u mV\r", Battery_mV);
                 if(Battery_mV < BATTERY_DEAD_mv) {
                     Printf("Discharged: %u\r", Battery_mV);
-//                    EnterSleep();
+                    EnterSleep();
                 }
-//                Printf("%u %u VBat: %u mV\r", Msg.Values16[0], Msg.Values16[1], Battery_mV);
-            } break;
+                break;
 
             case evtIdCheckRxTable: CheckRxTable(); break;
+
+            case evtIdButtons:
+//                Printf("Btn %u\r", Msg.BtnEvtInfo.Type);
+                if(Msg.BtnEvtInfo.Type == beLongPress) EnterSleep();
+                else { // Shortpress
+                    Printf("VBat: %u mV\r", Battery_mV);
+                }
+                break;
 
             case evtIdShellCmdRcvd:
                 while(((CmdUart_t*)Msg.Ptr)->TryParseRxBuff() == retvOk) OnCmd((Shell_t*)((CmdUart_t*)Msg.Ptr));
@@ -237,10 +260,12 @@ void EnterSleepNow() {
     PWR->PUCRA |= PWR_PDCRA_PA0; // Charging
     // Enable inner pull-downs
     PWR->PDCRA |= PWR_PDCRA_PA2; // USB
+    PWR->PDCRC |= PWR_PDCRC_PC13; // Button
     // Apply PullUps and PullDowns
     PWR->CR3 |= PWR_CR3_APC;
     // Enable wake-up srcs
     Sleep::EnableWakeup1Pin(rfFalling); // Charging
+    Sleep::EnableWakeup2Pin(rfRising); // Button
     Sleep::EnableWakeup4Pin(rfRising); // USB
     Sleep::ClearWUFFlags();
     Sleep::EnterStandby();
@@ -248,6 +273,7 @@ void EnterSleepNow() {
 
 void EnterSleep() {
     Printf("Entering sleep\r");
+    Radio.Stop();
     chThdSleepMilliseconds(45);
     chSysLock();
     EnterSleepNow();

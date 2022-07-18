@@ -39,7 +39,7 @@ static void SensorsThread(void *arg) {
                 if(PostProcessor != nullptr) PostProcessor(PStates, GroupLen);
                 // Prepare for next group
                 PostProcessor = PinSns[i].Postprocessor;
-                GroupLen = 0;
+                GroupLen = 1; // There is one pin in new group already
                 PStates = &States[i];
             }
             else GroupLen++;    // else increase group len

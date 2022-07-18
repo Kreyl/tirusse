@@ -23,6 +23,7 @@ enum EvtMsgId_t {
     evtIdUsbOutDone,
 
     // Misc periph
+    evtIdButtons,
     evtIdADC,
     evtIdAcc,
     evtIdCheckRxTable,

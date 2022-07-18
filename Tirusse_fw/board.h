@@ -26,7 +26,7 @@
 #define I2C2_ENABLED            FALSE
 #define I2C3_ENABLED            FALSE
 #define SIMPLESENSORS_ENABLED   TRUE
-#define BUTTONS_ENABLED         FALSE
+#define BUTTONS_ENABLED         TRUE
 
 #define ADC_REQUIRED            TRUE
 #define STM32_DMA_REQUIRED      TRUE    // Leave this macro name for OS
@@ -34,6 +34,9 @@
 #if 1 // ========================== GPIO =======================================
 // EXTI
 #define INDIVIDUAL_EXTI_IRQ_REQUIRED    FALSE
+
+// Button
+#define BTN_PIN         GPIOC, 13
 
 // Battery
 #define IS_CHARGING     GPIOA, 0, pudPullUp

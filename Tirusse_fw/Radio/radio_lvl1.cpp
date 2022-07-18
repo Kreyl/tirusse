@@ -29,6 +29,7 @@ cc1101_t CC(CC_Setup0);
 rLevel1_t Radio;
 int8_t Rssi;
 static rPkt_t PktRx;
+static bool IsSleeping = false;
 
 #if 1 // ================================ Task =================================
 static THD_WORKING_AREA(warLvl1Thread, 256);
@@ -43,7 +44,7 @@ void rLevel1_t::ITask() {
     while(true) {
         CC.Recalibrate();
         systime_t Start = chVTGetSystemTimeX();
-        while(chVTTimeElapsedSinceX(Start) < TIME_MS2I(RX_DURATION_MS)) {
+        while(chVTTimeElapsedSinceX(Start) < TIME_MS2I(RX_DURATION_MS) and Enabled) {
             if(CC.Receive(RX_DURATION_MS, (uint8_t*)&PktRx, RPKT_LEN, &Rssi) == retvOk) {
 //                Printf("ID: %u; Type: %u; Rssi: %d\r", PktRx.ID, PktRx.Type, Rssi);
                 if(PktRx.Salt == RPKT_SALT) {
@@ -54,8 +55,15 @@ void rLevel1_t::ITask() {
             }
         }
         CC.PowerOff();
+        IsSleeping = true;
         chThdSleepMilliseconds(SLEEP_DURATION_MS);
+        IsSleeping = false;
     } // while true
+}
+
+void rLevel1_t::Stop() {
+    Enabled = false;
+    while(!IsSleeping) chThdSleepMilliseconds(7);
 }
 #endif // task
 
