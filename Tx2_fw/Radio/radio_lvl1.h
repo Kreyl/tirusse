@@ -14,46 +14,6 @@
 #include "uart.h"
 #include "MsgQ.h"
 
-#if 0 // ========================= Signal levels ===============================
-// Python translation for db
-#define RX_LVL_TOP      1000
-// Jolaf: str(tuple(1 + int(sqrt(float(i) / 65) * 99) for i in xrange(0, 65 + 1)))
-//const int32_t dBm2Percent1000Tbl[66] = {10, 130, 180, 220, 250, 280, 310, 330, 350, 370, 390, 410, 430, 450, 460, 480, 500, 510, 530, 540, 550, 570, 580, 590, 610, 620, 630, 640, 650, 670, 680, 690, 700, 710, 720, 730, 740, 750, 760, 770, 780, 790, 800, 810, 820, 830, 840, 850, 860, 860, 870, 880, 890, 900, 910, 920, 920, 930, 940, 950, 960, 960, 970, 980, 990, 1000};
-const int32_t dBm2Percent1000Tbl[86] = {
-         10, 117, 162, 196, 225, 250, 273, 294, 314, 332,
-        350, 366, 382, 397, 412, 426, 440, 453, 466, 478,
-        490, 502, 514, 525, 536, 547, 558, 568, 578, 588,
-        598, 608, 617, 627, 636, 645, 654, 663, 672, 681,
-        689, 698, 706, 714, 722, 730, 738, 746, 754, 762,
-        769, 777, 784, 792, 799, 806, 814, 821, 828, 835,
-        842, 849, 856, 862, 869, 876, 882, 889, 895, 902,
-        908, 915, 921, 927, 934, 940, 946, 952, 958, 964,
-        970, 976, 982, 988, 994, 1000
-};
-
-static inline int32_t dBm2Percent(int32_t Rssi) {
-    if(Rssi < -100) Rssi = -100;
-    else if(Rssi > -15) Rssi = -15;
-    Rssi += 100;    // 0...85
-    return dBm2Percent1000Tbl[Rssi];
-}
-
-// Conversion Lvl1000 <=> Lvl250
-#define Lvl1000ToLvl250(Lvl1000) ((uint8_t)((Lvl1000 + 3) / 4))
-
-static inline void Lvl250ToLvl1000(uint16_t *PLvl) {
-    *PLvl = (*PLvl) * 4;
-}
-
-// Sensitivity Constants, percent [1...1000]. Feel if RxLevel > SnsConst.
-#define RLVL_NEVER              10000
-#define RLVL_2M                 800     // 0...4m
-#define RLVL_4M                 700     // 1...20m
-#define RLVL_10M                600
-#define RLVL_50M                1
-
-#endif
-
 __unused
 static const uint8_t PwrTable[12] = {
         CC_PwrMinus30dBm, // 0
@@ -74,9 +34,14 @@ static const uint8_t PwrTable[12] = {
 union rPkt_t {
     uint32_t DW32[2];
     struct {
-        uint32_t Sign;
-        uint8_t R, G, B;
-        uint8_t BtnIndx;
+        uint8_t ID; // Required to distinct packets from same src
+        uint8_t TimeSrc;
+        uint8_t HopCnt;
+        uint16_t iTime;
+        // Payload
+        uint8_t Type;
+        int8_t Rssi; // Will be set after RX. Transmitting is useless, but who cares.
+        uint8_t Salt;
     } __attribute__((__packed__));
     rPkt_t& operator = (const rPkt_t &Right) {
         DW32[0] = Right.DW32[0];
@@ -87,122 +52,104 @@ union rPkt_t {
 #endif
 
 #define RPKT_LEN    sizeof(rPkt_t)
+#define RPKT_SALT   0xCA
 
 #if 1 // =================== Channels, cycles, Rssi  ===========================
-#define RCHNL_EACH_OTH  7
-#define RCHNL_FAR       0
-
-#define TX_PWR_FAR      CC_PwrPlus10dBm
+#define RCHNL_EACH_OTH  2
 
 // Feel-Each-Other related
-#define RCYCLE_CNT              5
-#define FAR_CYCLE_INDX          (RCYCLE_CNT - 1)
-#define FAR_CYCLE_DURATION_MS   42
-#define RSLOT_CNT               50
-#define RSLOT_DURATION_ST       36
-#define CYCLE_DURATION_ST       (RSLOT_DURATION_ST * RSLOT_CNT)
-//#define MAX_RANDOM_DURATION_MS  18
+#define RCYCLE_CNT              5U
+#define RSLOT_CNT               104U // From excel
+#define SCYCLES_TO_KEEP_TIMESRC 4U  // After that amount of supercycles, TimeSrcID become self ID
 
-
-#define SCYCLES_TO_KEEP_TIMESRC 4   // After that amount of supercycles, TimeSrcID become self ID
+// Timings: based on (27MHz/192) clock of CC, divided by 4 with prescaler
+#define RTIM_PRESCALER          1U  // From excel
+#define TIMESLOT_DUR_TICKS      72U // From excel
+#define CYCLE_DUR_TICKS         (TIMESLOT_DUR_TICKS * RSLOT_CNT)
+#define SUPERCYCLE_DUR_TICKS    (CYCLE_DUR_TICKS * RCYCLE_CNT)
+#if SUPERCYCLE_DUR_TICKS >= 0xFFFF
+#error "Too long supercycle"
+#endif
+#define ZERO_ID_INCREMENT       3U // [0;100) -> [3;103) to process start of zero cycle calibration delay
+#define HOPS_CNT_MAX            4U // do not adjust time if too many hops. Required to avoid eternal loops adjustment.
+// Experimental values
+#define TX_DUR_TICS             60U
 
 #endif
 
-#if 0 // ============================= RX Table ================================
-#define RXTABLE_SZ              50
-#define RXT_PKT_REQUIRED        TRUE
+#if 1 // ============================= RX Table ================================
+struct rPayload_t {
+    uint8_t IsValid = 0;
+    uint8_t Type;
+} __attribute__ ((__packed__));
+
+#define RXTABLE_SZ              RSLOT_CNT
+
+// RxTable must be cleared during processing
 class RxTable_t {
 private:
-#if RXT_PKT_REQUIRED
-    rPkt_t IBuf[RXTABLE_SZ];
-#else
-    uint8_t IdBuf[RXTABLE_SZ];
-#endif
+    rPayload_t IBuf[RXTABLE_SZ];
 public:
-    uint32_t Cnt = 0;
-#if RXT_PKT_REQUIRED
-    void AddOrReplaceExistingPkt(rPkt_t &APkt) {
+    void AddOrReplaceExistingPkt(rPkt_t *APkt) {
         chSysLock();
-        for(uint32_t i=0; i<Cnt; i++) {
-            if((IBuf[i].ID == APkt.ID) and (IBuf[i].RCmd == APkt.RCmd)) {
-                if(IBuf[i].Rssi < APkt.Rssi) IBuf[i] = APkt; // Replace with newer pkt if RSSI is stronger
-                chSysUnlock();
-                return;
-            }
-        }
-        // Same ID not found
-        if(Cnt < RXTABLE_SZ) {
-            IBuf[Cnt] = APkt;
-            Cnt++;
-        }
+        AddOrReplaceExistingPktI(APkt);
         chSysUnlock();
     }
-
-    uint8_t GetPktByID(uint8_t ID, rPkt_t *ptr) {
-        for(uint32_t i=0; i<Cnt; i++) {
-            if(IBuf[i].ID == ID) {
-                *ptr = IBuf[i];
-                return retvOk;
-            }
+    void AddOrReplaceExistingPktI(rPkt_t *pPkt) {
+        if(pPkt->ID < RXTABLE_SZ) {
+            IBuf[pPkt->ID].Type = pPkt->Type;
+            IBuf[pPkt->ID].IsValid = 1;
         }
-        return retvFail;
     }
 
-    bool IDPresents(uint8_t ID) {
-        for(uint32_t i=0; i<Cnt; i++) {
-            if(IBuf[i].ID == ID) return true;
-        }
-        return false;
-    }
-
-    rPkt_t& operator[](const int32_t Indx) {
+    rPayload_t& operator[](const int32_t Indx) {
         return IBuf[Indx];
     }
-#else
-    void AddId(uint8_t ID) {
-        if(Cnt >= RXTABLE_SZ) return;   // Buffer is full, nothing to do here
-        for(uint32_t i=0; i<Cnt; i++) {
-            if(IdBuf[i] == ID) return;
+
+    void ProcessCountingDistinctTypes(uint32_t *TypeTable, uint8_t TableSz) {
+        for(auto &Payload : IBuf) {
+            if(Payload.IsValid and Payload.Type < TableSz) {
+                TypeTable[Payload.Type]++;
+                Payload.IsValid = 0; // Clear item for future use
+            }
         }
-        IdBuf[Cnt] = ID;
-        Cnt++;
     }
 
-#endif
-
     void Print() {
-        Printf("RxTable Cnt: %u\r", Cnt);
-        for(uint32_t i=0; i<Cnt; i++) {
-#if RXT_PKT_REQUIRED
-//            Printf("ID: %u; State: %u\r", IBuf[i].ID, IBuf[i].State);
-#else
-            Printf("ID: %u\r", IdBuf[i]);
-#endif
+        Printf("RxTable\r");
+        for(uint32_t i=0; i<RXTABLE_SZ; i++) {
+            if(IBuf[i].IsValid) Printf("ID: %u; Type: %u\r", i, IBuf[i].Type);
         }
     }
 };
 #endif
 
-// Message queue
-#define R_MSGQ_LEN      9
-enum RmsgId_t { rmsgEachOthRx, rmsgEachOthTx, rmsgEachOthSleep, rmsgPktRx, rmsgFar };
-struct RMsg_t {
-    RmsgId_t Cmd;
-    uint8_t Value;
-    RMsg_t() : Cmd(rmsgEachOthSleep), Value(0) {}
-    RMsg_t(RmsgId_t ACmd) : Cmd(ACmd), Value(0) {}
-    RMsg_t(RmsgId_t ACmd, uint8_t AValue) : Cmd(ACmd), Value(AValue) {}
-} __attribute__((packed));
-
 class rLevel1_t {
 private:
-    bool CCIsInitialized = false;
-    uint8_t InitCC();
+    RxTable_t RxTable1, RxTable2, *RxTableW = &RxTable1;
 public:
-    rPkt_t PktRx, PktTx;
-//    EvtMsgQ_t<RMsg_t, R_MSGQ_LEN> RMsgQ;
+    uint8_t TxPower;
+
+    void AddPktToRxTableI(rPkt_t *pPkt) { RxTableW->AddOrReplaceExistingPktI(pPkt); }
+
+    RxTable_t* GetRxTable() {
+        chSysLock();
+        RxTable_t* RxTableR;
+        // Switch tables
+        if(RxTableW == &RxTable1) {
+            RxTableW = &RxTable2;
+            RxTableR = &RxTable1;
+        }
+        else {
+            RxTableW = &RxTable1;
+            RxTableR = &RxTable2;
+        }
+        chSysUnlock();
+        return RxTableR;
+    }
+
     uint8_t Init();
-    uint8_t InitAndRxOnce();
+
     // Inner use
     void ITask();
 };

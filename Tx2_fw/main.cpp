@@ -10,6 +10,7 @@
 #include "radio_lvl1.h"
 #include "led.h"
 #include "Sequences.h"
+#include "Config.h"
 #endif
 #if 1 // ======================== Variables & prototypes =======================
 // Forever
@@ -27,6 +28,8 @@ LedSmooth_t Lumos { LED_PIN };
 extern Adc_t Adc;
 void OnMeasurementDone();
 TmrKL_t TmrOneS {TIME_MS2I(999), evtIdEverySecond, tktPeriodic};
+
+Config_t Cfg;
 #endif
 
 int main(void) {
