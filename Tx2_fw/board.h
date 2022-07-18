@@ -54,6 +54,10 @@
 
 // Radio: SPI, PGpio, Sck, Miso, Mosi, Cs, Gdo0
 #define CC_Setup0       SPI1, GPIOA, 5,6,7, GPIOA,2, GPIOA,4
+#define RADIO_TIM       TIM15
+#define RTIM_IN_PIN     GPIOA, 3, pudPullDown // For AF input, pin must be configured as input
+#define RTIM_IRQ_HNDLR  VectorA0 // TIM15 irq
+#define RTIM_IRQ_N      TIM1_BRK_TIM15_IRQn
 
 #endif // GPIO
 

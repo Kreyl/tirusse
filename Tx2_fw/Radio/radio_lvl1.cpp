@@ -15,8 +15,8 @@ cc1101_t CC(CC_Setup0);
 #define DBG_PINS
 
 #ifdef DBG_PINS
-#define DBG_GPIO1   GPIOB
-#define DBG_PIN1    10
+#define DBG_GPIO1   GPIOA
+#define DBG_PIN1    15
 #define DBG1_SET()  PinSetHi(DBG_GPIO1, DBG_PIN1)
 #define DBG1_CLR()  PinSetLo(DBG_GPIO1, DBG_PIN1)
 #define DBG_GPIO2   GPIOB
@@ -29,8 +29,8 @@ cc1101_t CC(CC_Setup0);
 #endif
 
 rLevel1_t Radio;
-/*
-static Timer_t IHwTmr(TIM15);
+
+static Timer_t IHwTmr(RADIO_TIM);
 static volatile uint8_t TimeSrc, HopCnt;
 static volatile rPkt_t PktRx, PktTx;
 static volatile uint32_t TimeSrcTimeout = 0;
@@ -55,7 +55,7 @@ static void AdjustRadioTimeI() {
         TimeSrc = PktRx.TimeSrc;
         HopCnt = PktRx.HopCnt + 1; // Increment hopcnt to show that it is from someone else
         TimeSrcTimeout = 0; // Reset Time Src Timeout
-        TIM9->SR = 0; // Clear flags
+        RADIO_TIM->SR = 0; // Clear flags
         uint32_t t = PktRx.iTime;
         // Increment time to take into account duration of pkt transmission
         t += TX_DUR_TICS;
@@ -121,18 +121,18 @@ static void IOnCycle0EndI() {
 
 // ==== Timer IRQ ====
 extern "C"
-void VectorA4() {
+void RTIM_IRQ_HNDLR() {
     CH_IRQ_PROLOGUE();
     chSysLockFromISR();
-    uint32_t SR = TIM9->SR & TIM9->DIER; // Process enabled irqs only
-    TIM9->SR = 0; // Clear flags
+    uint32_t SR = RADIO_TIM->SR & RADIO_TIM->DIER; // Process enabled irqs only
+    RADIO_TIM->SR = 0; // Clear flags
     if(SR & TIM_SR_CC1IF) IOnTxSlotI();
     if(SR & TIM_SR_CC2IF) IOnCycle0EndI();
     if(SR & TIM_SR_UIF)   IOnNewSupercycleI();
     chSysUnlockFromISR();
     CH_IRQ_EPILOGUE();
 }
-*/
+
 #if 1 // ============================
 uint8_t rLevel1_t::Init() {
 #ifdef DBG_PINS
@@ -143,10 +143,11 @@ uint8_t rLevel1_t::Init() {
     if(CC.Init() == retvOk) {
         CC.SetPktSize(RPKT_LEN);
         CC.SetChannel(RCHNL_EACH_OTH);
-        CC.SetTxPower(Cfg.TxPower);
+//        CC.SetTxPower(Cfg.TxPower);
+        CC.SetTxPower(CC_Pwr0dBm);
         Radio.TxPower = Cfg.TxPower;
         CC.SetBitrate(CCBitrate500k);
-/*
+
         PktTx.Salt = RPKT_SALT;
         TimeSrc = Cfg.ID;
         HopCnt = 0;
@@ -155,9 +156,10 @@ uint8_t rLevel1_t::Init() {
         // IRQs: UPD is new supercycle, CCR1 is TX, CCR2 is end of Cycle0
         IHwTmr.Init();
         // Setup ext input
-        PinSetupAlterFunc(GPIOA, 2, omPushPull, pudNone, AF3);
+//        PinSetupAlterFunc(RTIM_IN_PIN);
+        PinSetupInput(RTIM_IN_PIN);
         IHwTmr.SelectSlaveMode(smExternal);
-        IHwTmr.SetTriggerInput(tiTI1FP1);
+        IHwTmr.SetTriggerInput(tiTI2FP2);
         // Setup timings
         IHwTmr.SetPrescaler(RTIM_PRESCALER);
         IHwTmr.SetTopValue(SUPERCYCLE_DUR_TICKS); // Will update at supercycle end
@@ -165,9 +167,9 @@ uint8_t rLevel1_t::Init() {
         // Setup IRQs
         IHwTmr.EnableIrqOnUpdate();   // New supercycle
         IHwTmr.EnableIrqOnCompare2(); // End of cycle 0
-        IHwTmr.EnableIrq(TIM9_IRQn, IRQ_PRIO_VERYHIGH);
+        IHwTmr.EnableIrq(RTIM_IRQ_N, IRQ_PRIO_VERYHIGH);
         IHwTmr.Enable();
-*/
+
         return retvOk;
     }
     else return retvFail;
