@@ -9,7 +9,7 @@
 
 #include "ChunkTypes.h"
 
-#if 1 // ============================ LED RGB ==================================
+#if 0 // ============================ LED RGB ==================================
 #define LOW_BRTNESS     4
 //const LedRGBChunk_t lsqModeTxStart[] = {
 //        {csSetup, 0, clYellow},
@@ -68,17 +68,17 @@ const LedRGBChunk_t lsqFailure[] = {
 
 const LedSmoothChunk_t lsqLStart[] = {
         {csSetup, 450, LED_TOP_BRIGHTNESS},
-        {csSetup, 450, 4},
+        {csSetup, 450, 3},
         {csEnd}
 };
 
-const LedSmoothChunk_t lsqLError[] = {
+const LedSmoothChunk_t lsqFailure[] = {
         {csSetup, 0, LED_TOP_BRIGHTNESS},
-        {csWait, 99},
+        {csWait, 72},
         {csSetup, 0, 0},
-        {csWait, 99},
+        {csWait, 72},
         {csRepeat, 45},
-        {csSetup, 450, 4},
+        {csSetup, 450, 1},
         {csEnd}
 };
 

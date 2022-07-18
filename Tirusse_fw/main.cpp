@@ -16,6 +16,7 @@
 #include "Settings.h"
 #include "Motion.h"
 #include "adcL476.h"
+#include "radio_lvl1.h"
 
 #if 1 // ======================== Variables and defines ========================
 // Forever
@@ -33,8 +34,9 @@ static const NeopixelParams_t NpxParams {NPX_SPI, NPX_DATA_PIN,
 };
 Neopixels_t Leds{&NpxParams};
 
-void LedPwrOn()  { PinSetHi(NPX_PWR_PIN); }
-void LedPwrOff() { PinSetLo(NPX_PWR_PIN); }
+void LedPwrOn()   { PinSetHi(NPX_PWR_PIN); }
+void LedPwrOff()  { PinSetLo(NPX_PWR_PIN); }
+bool IsLedPwrOn() { return PinIsHi(NPX_PWR_PIN); }
 
 // ==== USB & FileSys ====
 FATFS FlashFS;
@@ -56,9 +58,33 @@ const AdcSetup_t AdcSetup = {
 
 static void EnterSleepNow();
 static void EnterSleep();
+#endif
 
-// ==== Timers ====
-//static TmrKL_t TmrAcg {TIME_MS2I(450), evtIdAcc, tktPeriodic};
+#if 1 // ========================== Logic ======================================
+// === Types ===
+#define TYPE_OBSERVER           0
+#define TYPE_NOTHING            0 // What to show
+#define TYPE_DARKSIDE           1
+#define TYPE_LIGHTSIDE          2
+#define TYPE_BOTH               3 // Allow to tx just in case
+
+#define TYPE_CNT                4
+
+#define SMOOTH_VALUE            4500
+#define CLR_INDI                Color_t(0, 0, 54)
+
+static TmrKL_t TmrCheckRxTable {TIME_MS2I(1800), evtIdCheckRxTable, tktPeriodic};
+
+void CheckRxTable() {
+    // Analyze table: get count of every type near
+    uint32_t TypesCnt[TYPE_CNT] = {0};
+    RxTable_t *Tbl = Radio.GetRxTable();
+    Tbl->ProcessCountingDistinctTypes(TypesCnt, TYPE_CNT);
+    uint32_t Cnt = TypesCnt[TYPE_DARKSIDE] + TypesCnt[TYPE_BOTH];
+    // Fade blade if USB connected or nobody around
+    if(Cnt == 0 or UsbIsConnected) Eff::SetBlade(clBlack,  SMOOTH_VALUE);
+    else Eff::SetBlade(CLR_INDI, SMOOTH_VALUE);
+}
 #endif
 
 int main(void) {
@@ -115,8 +141,8 @@ int main(void) {
     Leds.Init();
     // LED pwr pin
     PinSetupOut(NPX_PWR_PIN, omPushPull);
-    LedPwrOn();
-//    Leds.SetAll(clGreen);
+//    LedPwrOn();
+//    Leds.SetAll(clBlue);
 //    Leds.SetCurrentColors();
 
 /*    // Init filesystem
@@ -132,18 +158,24 @@ int main(void) {
 
     Eff::Init();
 
-    UsbMsd.Init();
+//    UsbMsd.Init();
     SimpleSensors::Init();
 
     // Battery measurement
     PinSetupOut(BAT_MEAS_EN, omPushPull);
     PinSetHi(BAT_MEAS_EN); // Enable it forever, as 200k produces ignorable current
-
     // Inner ADC
 //    Adc.Init(AdcSetup);
 //    Adc.StartPeriodicMeasurement(1);
 //    PinSetupAnalog(ADC_BAT_PIN);
 
+    if(Radio.Init() == retvOk) Lumos.StartOrRestart(lsqLStart);
+    else {
+        Lumos.StartOrRestart(lsqFailure);
+        chThdSleepMilliseconds(1008);
+    }
+
+    TmrCheckRxTable.StartOrRestart();
 
     // Main cycle
     ITask();
@@ -164,10 +196,7 @@ void ITask() {
                 }
             } break;
 
-            case evtIdAcc:
-                Leds.SetCurrentColors();
-//                Motion::Update();
-                break;
+            case evtIdCheckRxTable: CheckRxTable(); break;
 
             case evtIdShellCmdRcvd:
                 while(((CmdUart_t*)Msg.Ptr)->TryParseRxBuff() == retvOk) OnCmd((Shell_t*)((CmdUart_t*)Msg.Ptr));
@@ -175,11 +204,12 @@ void ITask() {
 
 #if 1       // ======= USB =======
             case evtIdUsbConnect:
+                Eff::SetBlade(clBlack, SMOOTH_VALUE);
                 Printf("USB connect\r");
-                UsbMsd.Connect();
+//                UsbMsd.Connect();
                 break;
             case evtIdUsbDisconnect:
-                UsbMsd.Disconnect();
+//                UsbMsd.Disconnect();
                 Printf("USB disconnect\r");
                 break;
             case evtIdUsbReady:
@@ -205,12 +235,11 @@ void ProcessUsbDetect(PinSnsState_t *PState, uint32_t Len) {
 void ProcessCharging(PinSnsState_t *PState, uint32_t Len) {
     if(*PState == pssLo) {
         Lumos.StartOrContinue(lsqLCharging);
-        LedPwrOff();
     }
     else if(*PState == pssRising) { // Charge stopped
         Lumos.StartOrContinue(lsqLStart);
     }
-    else if(*PState == pssHi) LedPwrOn();
+//    else if(*PState == pssHi) LedPwrOn();
 }
 
 void OnAdcDoneI() {

@@ -25,5 +25,6 @@ enum EvtMsgId_t {
     // Misc periph
     evtIdADC,
     evtIdAcc,
+    evtIdCheckRxTable,
     evtIdPwrOffTimeout,
 };

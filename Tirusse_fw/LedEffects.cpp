@@ -12,6 +12,10 @@
 
 extern Neopixels_t Leds;
 
+void LedPwrOn();
+void LedPwrOff();
+bool IsLedPwrOn();
+
 #define LED_CNT     NPX_LED_CNT
 
 static void TmrCallbackUpdate(void *p);
@@ -52,9 +56,7 @@ public:
     void UpdateI() { ClrCurr.Adjust(ClrTarget); }
     void Draw() {
         if(ClrCurr != ClrTarget and !TimerIsStarted()) StartTimer(ClrCurr.DelayToNextAdj(ClrTarget, Smooth));
-//        chSysLock();
         for(uint32_t i=1; i<(LED_CNT-1); i++) Leds.ClrBuf[i] = ClrCurr;
-//        chSysUnlock();
     }
 };
 
@@ -81,8 +83,13 @@ static void NpxThread(void *arg) {
         chSysLock();
         if(!Leds.TransmitDone) chThdSuspendS(&ThdRef); // Wait Leds done
         chSysUnlock();
-        Leds.SetCurrentColors(); // Send current buf to leds
-        // ==== Process effects ====
+        // Draw or switch off
+        if(Leds.AreOff()) LedPwrOff();
+        else {
+            LedPwrOn();
+            Leds.SetCurrentColors(); // Send current buf to leds
+        }
+        // Process effects
         Blade.Draw();
     } // while true
 }

@@ -7,12 +7,8 @@
 
 #include "radio_lvl1.h"
 #include "cc1101.h"
-#include "uart2.h"
-#include "led.h"
-#include "vibro.h"
 
 cc1101_t CC(CC_Setup0);
-extern int32_t ID;
 
 //#define DBG_PINS
 
@@ -22,7 +18,7 @@ extern int32_t ID;
 #define DBG1_SET()  PinSetHi(DBG_GPIO1, DBG_PIN1)
 #define DBG1_CLR()  PinSetLo(DBG_GPIO1, DBG_PIN1)
 #define DBG_GPIO2   GPIOB
-#define DBG_PIN2    9
+#define DBG_PIN2    11
 #define DBG2_SET()  PinSetHi(DBG_GPIO2, DBG_PIN2)
 #define DBG2_CLR()  PinSetLo(DBG_GPIO2, DBG_PIN2)
 #else
@@ -31,10 +27,8 @@ extern int32_t ID;
 #endif
 
 rLevel1_t Radio;
-rPkt_t Pkt;
-extern LedRGB_t Led;
-extern LedSmooth_t Lumos;
-extern Vibro_t Vibro;
+int8_t Rssi;
+static rPkt_t PktRx;
 
 #if 1 // ================================ Task =================================
 static THD_WORKING_AREA(warLvl1Thread, 256);
@@ -43,33 +37,27 @@ static void rLvl1Thread(void *arg) {
     chRegSetThreadName("rLvl1");
     Radio.ITask();
 }
-#endif // task
 
 __noreturn
 void rLevel1_t::ITask() {
     while(true) {
         CC.Recalibrate();
-        uint8_t RxRslt = CC.Receive(7, &Pkt, RPKT_LEN, &Rssi);
-        if(RxRslt == retvOk) {
-//            Printf("\rRssi=%d", Rssi);
-            // Process received
-            Led.SetColor(Color_t(Pkt.R, Pkt.G, Pkt.B));
-            Lumos.SetBrightness(Pkt.W);
-            Vibro.Set(Pkt.VibroPwr);
-
-            // Send all data in queue
-            while(TxBuf.Get(&Pkt) == retvOk) {
-                chThdSleepMilliseconds(2); // Let receiver think. Waste some ms here.
-                CC.Transmit(&Pkt, RPKT_LEN);
-            } // while
-        } // if rcvd
+        systime_t Start = chVTGetSystemTimeX();
+        while(chVTTimeElapsedSinceX(Start) < TIME_MS2I(RX_DURATION_MS)) {
+            if(CC.Receive(RX_DURATION_MS, (uint8_t*)&PktRx, RPKT_LEN, &Rssi) == retvOk) {
+//                Printf("ID: %u; Type: %u; Rssi: %d\r", PktRx.ID, PktRx.Type, Rssi);
+                if(PktRx.Salt == RPKT_SALT) {
+                    chSysLock();
+                    Radio.AddPktToRxTableI(&PktRx);
+                    chSysUnlock();
+                }
+            }
+        }
+        CC.PowerOff();
+        chThdSleepMilliseconds(SLEEP_DURATION_MS);
     } // while true
 }
-
-void rLevel1_t::TryToSleep(uint32_t SleepDuration) {
-    if(SleepDuration >= MIN_SLEEP_DURATION_MS) CC.PowerOff();
-    chThdSleepMilliseconds(SleepDuration);
-}
+#endif // task
 
 #if 1 // ============================
 uint8_t rLevel1_t::Init() {
@@ -78,11 +66,12 @@ uint8_t rLevel1_t::Init() {
     PinSetupOut(DBG_GPIO2, DBG_PIN2, omPushPull);
 #endif
 
-//    RMsgQ.Init();
     if(CC.Init() == retvOk) {
-        CC.SetTxPower(CC_Pwr0dBm);
         CC.SetPktSize(RPKT_LEN);
-        CC.SetChannel(ID);
+        CC.SetChannel(RCHNL_EACH_OTH);
+        CC.SetTxPower(CC_Pwr0dBm); // dummy
+        CC.SetBitrate(CCBitrate500k);
+
         chThdCreateStatic(warLvl1Thread, sizeof(warLvl1Thread), HIGHPRIO, (tfunc_t)rLvl1Thread, NULL);
         return retvOk;
     }

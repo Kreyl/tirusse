@@ -569,7 +569,7 @@
         		
         <configuration configurationName="Release">
             			
-            <resource resourceType="PROJECT" workspacePath="/Lestanarve"/>
+            <resource resourceType="PROJECT" workspacePath="/Tirusse"/>
             		
         </configuration>
         	
@@ -581,19 +581,31 @@
         		
         <autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId=""/>
         		
-        <scannerConfigBuildInfo instanceId="com.st.stm32cube.ide.mcu.gnu.managedbuild.config.exe.release.908338780;com.st.stm32cube.ide.mcu.gnu.managedbuild.config.exe.release.908338780.;com.st.stm32cube.ide.mcu.gnu.managedbuild.tool.cpp.compiler.383358493;com.st.stm32cube.ide.mcu.gnu.managedbuild.tool.cpp.compiler.input.cpp.1040218658">
-            			
-            <autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId=""/>
-            		
-        </scannerConfigBuildInfo>
-        		
         <scannerConfigBuildInfo instanceId="com.atollic.truestudio.exe.debug.2046682123;com.atollic.truestudio.exe.debug.2046682123.;com.atollic.truestudio.exe.debug.toolchain.gpp.1278203976;com.atollic.truestudio.gpp.input.1485199058">
             			
             <autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId="com.atollic.truestudio.mbs.ARMToolsPerProjectProfileCPP"/>
             		
         </scannerConfigBuildInfo>
         		
-        <scannerConfigBuildInfo instanceId="com.st.stm32cube.ide.mcu.gnu.managedbuild.config.exe.release.908338780;com.st.stm32cube.ide.mcu.gnu.managedbuild.config.exe.release.908338780.;com.st.stm32cube.ide.mcu.gnu.managedbuild.tool.c.compiler.1573874866;com.st.stm32cube.ide.mcu.gnu.managedbuild.tool.c.compiler.input.c.306462974">
+        <scannerConfigBuildInfo instanceId="com.atollic.truestudio.configuration.release.543367137;com.atollic.truestudio.configuration.release.543367137.;com.atollic.truestudio.exe.release.toolchain.gpp.522652045;com.atollic.truestudio.gpp.input.997669690">
+            			
+            <autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId="com.atollic.truestudio.mbs.ARMToolsPerProjectProfileCPP"/>
+            		
+        </scannerConfigBuildInfo>
+        		
+        <scannerConfigBuildInfo instanceId="com.st.stm32cube.ide.mcu.gnu.managedbuild.config.exe.debug.1114447362;com.st.stm32cube.ide.mcu.gnu.managedbuild.config.exe.debug.1114447362.;com.st.stm32cube.ide.mcu.gnu.managedbuild.tool.cpp.compiler.843701445;com.st.stm32cube.ide.mcu.gnu.managedbuild.tool.cpp.compiler.input.cpp.671414149">
+            			
+            <autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId=""/>
+            		
+        </scannerConfigBuildInfo>
+        		
+        <scannerConfigBuildInfo instanceId="com.atollic.truestudio.exe.debug.2046682123;com.atollic.truestudio.exe.debug.2046682123.;com.atollic.truestudio.exe.debug.toolchain.gcc.172431909;com.atollic.truestudio.gcc.input.361819729">
+            			
+            <autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId="com.atollic.truestudio.mbs.ARMToolsPerProjectProfileC"/>
+            		
+        </scannerConfigBuildInfo>
+        		
+        <scannerConfigBuildInfo instanceId="com.st.stm32cube.ide.mcu.gnu.managedbuild.config.exe.release.908338780;com.st.stm32cube.ide.mcu.gnu.managedbuild.config.exe.release.908338780.;com.st.stm32cube.ide.mcu.gnu.managedbuild.tool.cpp.compiler.383358493;com.st.stm32cube.ide.mcu.gnu.managedbuild.tool.cpp.compiler.input.cpp.1040218658">
             			
             <autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId=""/>
             		
@@ -605,25 +617,13 @@
             		
         </scannerConfigBuildInfo>
         		
-        <scannerConfigBuildInfo instanceId="com.atollic.truestudio.exe.debug.2046682123;com.atollic.truestudio.exe.debug.2046682123.;com.atollic.truestudio.exe.debug.toolchain.gcc.172431909;com.atollic.truestudio.gcc.input.361819729">
-            			
-            <autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId="com.atollic.truestudio.mbs.ARMToolsPerProjectProfileC"/>
-            		
-        </scannerConfigBuildInfo>
-        		
-        <scannerConfigBuildInfo instanceId="com.atollic.truestudio.configuration.release.543367137;com.atollic.truestudio.configuration.release.543367137.;com.atollic.truestudio.exe.release.toolchain.gpp.522652045;com.atollic.truestudio.gpp.input.997669690">
-            			
-            <autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId="com.atollic.truestudio.mbs.ARMToolsPerProjectProfileCPP"/>
-            		
-        </scannerConfigBuildInfo>
-        		
         <scannerConfigBuildInfo instanceId="com.st.stm32cube.ide.mcu.gnu.managedbuild.config.exe.debug.1114447362;com.st.stm32cube.ide.mcu.gnu.managedbuild.config.exe.debug.1114447362.;com.st.stm32cube.ide.mcu.gnu.managedbuild.tool.c.compiler.309816226;com.st.stm32cube.ide.mcu.gnu.managedbuild.tool.c.compiler.input.c.1903360416">
             			
             <autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId=""/>
             		
         </scannerConfigBuildInfo>
         		
-        <scannerConfigBuildInfo instanceId="com.st.stm32cube.ide.mcu.gnu.managedbuild.config.exe.debug.1114447362;com.st.stm32cube.ide.mcu.gnu.managedbuild.config.exe.debug.1114447362.;com.st.stm32cube.ide.mcu.gnu.managedbuild.tool.cpp.compiler.843701445;com.st.stm32cube.ide.mcu.gnu.managedbuild.tool.cpp.compiler.input.cpp.671414149">
+        <scannerConfigBuildInfo instanceId="com.st.stm32cube.ide.mcu.gnu.managedbuild.config.exe.release.908338780;com.st.stm32cube.ide.mcu.gnu.managedbuild.config.exe.release.908338780.;com.st.stm32cube.ide.mcu.gnu.managedbuild.tool.c.compiler.1573874866;com.st.stm32cube.ide.mcu.gnu.managedbuild.tool.c.compiler.input.c.306462974">
             			
             <autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId=""/>
             		
