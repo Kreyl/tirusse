@@ -47,7 +47,7 @@ bool UsbIsConnected = false;
 void OnAdcDoneI();
 
 const AdcSetup_t AdcSetup = {
-        .SampleTime = ast12d5Cycles,
+        .SampleTime = ast92d5Cycles,
         .Oversampling = AdcSetup_t::oversmp128,
         .DoneCallback = OnAdcDoneI,
         .Channels = {
@@ -89,8 +89,8 @@ void CheckRxTable() {
 
 int main(void) {
 #if 1 // ==== Init clock system ====
-    Clk.SetVoltageRange(mvrHiPerf);
-    Clk.SetupFlashLatency(40, mvrHiPerf);
+    Clk.SetVoltageRange(mvrLoPerf);
+    Clk.SetupFlashLatency(10, mvrHiPerf);
     Clk.EnablePrefetch();
     // HSE or MSI
     if(Clk.EnableHSE() == retvOk) {
@@ -101,26 +101,22 @@ int main(void) {
         Clk.SetupPllSrc(pllsrcMsi);
         Clk.SetupM(1);
     }
-    // SysClock 40MHz
-    Clk.SetupPll(20, 2, 4);
+    // SysClock 10MHz (not enough for USB)
+    Clk.SetupPll(20, 8, 4); // 4 * 20 / 8
     Clk.SetupBusDividers(ahbDiv1, apbDiv1, apbDiv1);
     if(Clk.EnablePLL() == retvOk) {
         Clk.EnablePllROut();
         Clk.SwitchToPLL();
     }
     // 48MHz clock for USB & 24MHz clock for ADC
-    Clk.SetupPllSai1(24, 4, 2, 7); // 4MHz * 24 = 96; R = 96 / 4 = 24, Q = 96 / 2 = 48
+    Clk.SetupPllSai1(24, 8, 2, 7); // 4MHz * 24 = 96; R = 96 / 8 = 12, Q = 96 / 2 = 48
     if(Clk.EnablePllSai1() == retvOk) {
         // Setup Sai1R as ADC source
         Clk.EnableSai1ROut();
-        uint32_t tmp = RCC->CCIPR;
-        tmp &= ~RCC_CCIPR_ADCSEL;
-        tmp |= 0b01UL << 28; // SAI1R is ADC clock
+        RCC->CCIPR = (RCC->CCIPR & ~RCC_CCIPR_ADCSEL) | (0b01UL << 28); // SAI1R is ADC clock
         // Setup Sai1Q as 48MHz source
-        Clk.EnableSai1QOut();
-        tmp &= ~RCC_CCIPR_CLK48SEL;
-        tmp |= 0b01UL << 26;
-        RCC->CCIPR = tmp;
+//        Clk.EnableSai1QOut();
+//        RCC->CCIPR = (RCC->CCIPR & ~RCC_CCIPR_CLK48SEL) | (0b01UL << 26);
     }
     Clk.UpdateFreqValues();
 #endif
@@ -145,17 +141,6 @@ int main(void) {
 //    Leds.SetAll(clBlue);
 //    Leds.SetCurrentColors();
 
-/*    // Init filesystem
-    FRESULT err;
-    err = f_mount(&FlashFS, "", 0);
-    if(err == FR_OK) {
-        Settings.Load();
-        if(Settings.LoadSuccessful) Lumos.StartOrRestart(lsqLStart);
-        else Lumos.StartOrRestart(lsqLError);
-    }
-    else Printf("FS error\r");
-    */
-
     Eff::Init();
 
 //    UsbMsd.Init();
@@ -165,16 +150,12 @@ int main(void) {
     PinSetupOut(BAT_MEAS_EN, omPushPull);
     PinSetHi(BAT_MEAS_EN); // Enable it forever, as 200k produces ignorable current
     // Inner ADC
-//    Adc.Init(AdcSetup);
-//    Adc.StartPeriodicMeasurement(1);
-//    PinSetupAnalog(ADC_BAT_PIN);
+    Adc.Init(AdcSetup);
+    Adc.StartPeriodicMeasurement(1);
 
+    // Radio
     if(Radio.Init() == retvOk) Lumos.StartOrRestart(lsqLStart);
-    else {
-        Lumos.StartOrRestart(lsqFailure);
-        chThdSleepMilliseconds(1008);
-    }
-
+    else Lumos.StartOrRestart(lsqFailure);
     TmrCheckRxTable.StartOrRestart();
 
     // Main cycle
@@ -189,11 +170,12 @@ void ITask() {
             case evtIdADC: {
                 Iwdg::Reload();
                 uint32_t Battery_mV = 2 * Adc.Adc2mV(Msg.Values16[0], Msg.Values16[1]); // *2 because of resistor divider
-                Printf("VBat: %u mV\r", Battery_mV);
+//                Printf("VBat: %u mV\r", Battery_mV);
                 if(Battery_mV < BATTERY_DEAD_mv) {
                     Printf("Discharged: %u\r", Battery_mV);
-                    EnterSleep();
+//                    EnterSleep();
                 }
+//                Printf("%u %u VBat: %u mV\r", Msg.Values16[0], Msg.Values16[1], Battery_mV);
             } break;
 
             case evtIdCheckRxTable: CheckRxTable(); break;

@@ -71,6 +71,7 @@ uint8_t rLevel1_t::Init() {
         CC.SetChannel(RCHNL_EACH_OTH);
         CC.SetTxPower(CC_Pwr0dBm); // dummy
         CC.SetBitrate(CCBitrate500k);
+//        CC.EnterPwrDown();
 
         chThdCreateStatic(warLvl1Thread, sizeof(warLvl1Thread), HIGHPRIO, (tfunc_t)rLvl1Thread, NULL);
         return retvOk;
