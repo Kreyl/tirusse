@@ -65,10 +65,11 @@ const LedRGBChunk_t lsqFailure[] = {
 
 #if 1 // =========================== LED Smooth ================================
 #define LED_TOP_BRIGHTNESS  255
+#define LED_LOW_BRIGHTNESS  3
 
 const LedSmoothChunk_t lsqLStart[] = {
         {csSetup, 450, LED_TOP_BRIGHTNESS},
-        {csSetup, 450, 3},
+        {csSetup, 450, LED_LOW_BRIGHTNESS},
         {csEnd}
 };
 
@@ -78,16 +79,23 @@ const LedSmoothChunk_t lsqFailure[] = {
         {csSetup, 0, 0},
         {csWait, 72},
         {csRepeat, 45},
-        {csSetup, 450, 1},
+        {csSetup, 450, LED_LOW_BRIGHTNESS},
         {csEnd}
 };
 
 const LedSmoothChunk_t lsqLCharging[] = {
         {csSetup, 270, LED_TOP_BRIGHTNESS},
-        {csSetup, 270, 7},
+        {csSetup, 270, LED_LOW_BRIGHTNESS},
         {csGoto, 0}
 };
 
+const LedSmoothChunk_t lsqDischarged[] = {
+        {csSetup, 0, LED_LOW_BRIGHTNESS},
+        {csWait, 207},
+        {csSetup, 0, 0},
+        {csWait, 207},
+        {csGoto, 0}
+};
 
 #endif
 

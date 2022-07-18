@@ -43,7 +43,8 @@ FATFS FlashFS;
 bool UsbIsConnected = false;
 
 // ==== ADC ====
-#define BATTERY_DEAD_mv 3300
+#define BATTERY_DEAD_mv 3200
+#define BATTERY_LOW_mv  3500
 void OnAdcDoneI();
 static uint32_t Battery_mV = 0;
 
@@ -83,8 +84,14 @@ void CheckRxTable() {
     Tbl->ProcessCountingDistinctTypes(TypesCnt, TYPE_CNT);
     uint32_t Cnt = TypesCnt[TYPE_DARKSIDE] + TypesCnt[TYPE_BOTH];
     // Fade blade if USB connected or nobody around
-    if(Cnt == 0 or UsbIsConnected) Eff::SetBlade(clBlack,  SMOOTH_VALUE);
-    else Eff::SetBlade(CLR_INDI, SMOOTH_VALUE);
+    if(Cnt == 0 or UsbIsConnected) {
+        Eff::SetBlade(clBlack,  SMOOTH_VALUE);
+        Eff::SetGem(clBlack, SMOOTH_VALUE);
+    }
+    else {
+        Eff::SetBlade(CLR_INDI, SMOOTH_VALUE);
+        Eff::SetGem(clBlue, SMOOTH_VALUE);
+    }
 }
 #endif
 
@@ -191,6 +198,7 @@ void ITask() {
                     Printf("Discharged: %u\r", Battery_mV);
                     EnterSleep();
                 }
+                else if(Battery_mV < BATTERY_LOW_mv) Lumos.StartOrContinue(lsqDischarged);
                 break;
 
             case evtIdCheckRxTable: CheckRxTable(); break;
@@ -200,6 +208,7 @@ void ITask() {
                 if(Msg.BtnEvtInfo.Type == beLongPress) EnterSleep();
                 else { // Shortpress
                     Printf("VBat: %u mV\r", Battery_mV);
+                    Eff::StartBatteryIndication(Battery_mV);
                 }
                 break;
 

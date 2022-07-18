@@ -60,9 +60,22 @@ public:
     }
 };
 
-
+class Gem_t : public ParentEff_t {
+private:
+    Color_t ClrCurr = clBlack;
+public:
+    Color_t ClrTarget = clBlack;
+    uint32_t Smooth = 0;
+    void UpdateI() { ClrCurr.Adjust(ClrTarget); }
+    void Draw() {
+        if(ClrCurr != ClrTarget and !TimerIsStarted()) StartTimer(ClrCurr.DelayToNextAdj(ClrTarget, Smooth));
+        Leds.ClrBuf[0] = ClrCurr;
+        Leds.ClrBuf[LED_CNT-1] = ClrCurr;
+    }
+};
 
 static Blade_t Blade;
+static Gem_t Gem;
 static thread_reference_t ThdRef;
 
 //static void SetGemClr(Color_t Clr) {
@@ -91,6 +104,7 @@ static void NpxThread(void *arg) {
         }
         // Process effects
         Blade.Draw();
+        Gem.Draw();
     } // while true
 }
 
@@ -109,14 +123,17 @@ void Init() {
 }
 
 void SetGem(Color_t Clr, uint32_t ASmooth) {
-//    ClrGemTarget = Clr;
-//    SmoothGem = ASmooth;
-//    chThdResume(&ThdRefGem, MSG_OK);
+    Gem.ClrTarget = Clr;
+    Gem.Smooth = ASmooth;
 }
 
 void SetBlade(Color_t Clr, uint32_t ASmooth) {
     Blade.ClrTarget = Clr;
     Blade.Smooth = ASmooth;
+}
+
+void StartBatteryIndication(uint32_t ABattery_mV) {
+
 }
 
 } // namespace
