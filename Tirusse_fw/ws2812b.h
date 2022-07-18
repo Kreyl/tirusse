@@ -122,9 +122,7 @@ public:
     void OnDmaDone();
     ColorBuf_t ClrBuf;
     void Init();
-    void SetAll(Color_t Clr) {
-        for(auto &IClr : ClrBuf) IClr = Clr;
-    }
+    void SetAll(Color_t Clr) { std::fill(ClrBuf.begin(), ClrBuf.end(), Clr); }
     void MixAllwWeight(Color_t Clr, uint32_t Weight) {
         for(auto &IClr : ClrBuf) IClr.MixwWeight(Clr, Weight);
     }

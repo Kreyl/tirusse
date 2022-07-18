@@ -16,6 +16,7 @@
 
 #include "mem_msd_glue.h"
 
+__attribute__((unused))
 extern void PrintfC(const char *format, ...);
 
 /*-----------------------------------------------------------------------*/

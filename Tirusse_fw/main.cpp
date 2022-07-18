@@ -206,10 +206,8 @@ void ITask() {
             case evtIdButtons:
 //                Printf("Btn %u\r", Msg.BtnEvtInfo.Type);
                 if(Msg.BtnEvtInfo.Type == beLongPress) EnterSleep();
-                else { // Shortpress
-                    Printf("VBat: %u mV\r", Battery_mV);
-                    Eff::StartBatteryIndication(Battery_mV);
-                }
+                // Shortpress
+                else Eff::StartBatteryIndication(Battery_mV);
                 break;
 
             case evtIdShellCmdRcvd:

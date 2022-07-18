@@ -9,6 +9,8 @@
 
 #include "color.h"
 
+#define BATTERY_INDICATION_DURATION_MS  1530
+
 namespace Eff {
 void Init();
 

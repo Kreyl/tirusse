@@ -14,7 +14,6 @@ extern Neopixels_t Leds;
 
 void LedPwrOn();
 void LedPwrOff();
-bool IsLedPwrOn();
 
 #define LED_CNT     NPX_LED_CNT
 
@@ -50,13 +49,48 @@ static void TmrCallbackUpdate(void *p) {
 class Blade_t : public ParentEff_t {
 private:
     Color_t ClrCurr = clBlack;
+    enum State_t {staIdle, staIndicateBattery, staEnterIdle} State;
+    Color_t ClrBattery;
+    uint32_t Sz;
 public:
     Color_t ClrTarget = clBlack;
     uint32_t Smooth = 0;
-    void UpdateI() { ClrCurr.Adjust(ClrTarget); }
+    void UpdateI() override {
+        if(State == staIndicateBattery) State = staEnterIdle; // Stop indicating battery
+        else ClrCurr.Adjust(ClrTarget);
+    }
+
     void Draw() {
-        if(ClrCurr != ClrTarget and !TimerIsStarted()) StartTimer(ClrCurr.DelayToNextAdj(ClrTarget, Smooth));
-        for(uint32_t i=1; i<(LED_CNT-1); i++) Leds.ClrBuf[i] = ClrCurr;
+        switch(State) {
+            case staIdle:
+                if(ClrCurr != ClrTarget and !TimerIsStarted()) StartTimer(ClrCurr.DelayToNextAdj(ClrTarget, Smooth));
+                for(uint32_t i=1; i<(LED_CNT-1); i++) Leds.ClrBuf[i] = ClrCurr;
+                break;
+
+            case staIndicateBattery:
+                if(!TimerIsStarted()) StartTimer(TIME_MS2I(BATTERY_INDICATION_DURATION_MS));
+                for(uint32_t i=1; i<(LED_CNT/2); i++) {
+                    Leds.ClrBuf[i] = (i <= Sz)? ClrBattery : clBlack;
+                    Leds.ClrBuf[LED_CNT - i - 1] = Leds.ClrBuf[i];
+                }
+                break;
+
+            case staEnterIdle:
+                if(ClrCurr != ClrTarget and !TimerIsStarted()) StartTimer(ClrCurr.DelayToNextAdj(ClrTarget, Smooth));
+                for(uint32_t i=1; i<(LED_CNT-1); i++) Leds.ClrBuf[i] = clBlack;
+                State = staIdle;
+                break;
+        } // switch
+    }
+
+    void DoBatteryIndication(Color_t AClr, uint32_t ASz) {
+        chSysLock();
+        StopTimerI();
+        ClrBattery = AClr;
+        Sz = ASz;
+        State = staIndicateBattery;
+        ClrCurr = clBlack;
+        chSysUnlock();
     }
 };
 
@@ -66,7 +100,7 @@ private:
 public:
     Color_t ClrTarget = clBlack;
     uint32_t Smooth = 0;
-    void UpdateI() { ClrCurr.Adjust(ClrTarget); }
+    void UpdateI() override { ClrCurr.Adjust(ClrTarget); }
     void Draw() {
         if(ClrCurr != ClrTarget and !TimerIsStarted()) StartTimer(ClrCurr.DelayToNextAdj(ClrTarget, Smooth));
         Leds.ClrBuf[0] = ClrCurr;
@@ -77,11 +111,6 @@ public:
 static Blade_t Blade;
 static Gem_t Gem;
 static thread_reference_t ThdRef;
-
-//static void SetGemClr(Color_t Clr) {
-//    Leds.ClrBuf[0] = Clr;
-//    Leds.ClrBuf[LED_CNT-1] = Clr;
-//}
 
 static THD_WORKING_AREA(waNpxThread, 256);
 __noreturn
@@ -133,7 +162,35 @@ void SetBlade(Color_t Clr, uint32_t ASmooth) {
 }
 
 void StartBatteryIndication(uint32_t ABattery_mV) {
-
+    Printf("VBat: %u mV\r", ABattery_mV);
+    // Calculate color and size
+    Color_t Clr;
+    uint32_t Sz;
+    if(ABattery_mV <= 3300) {
+        Clr.FromRGB(255, 0, 30);
+        Sz = 2;
+    }
+    else if(ABattery_mV <= 3400) {
+        Clr.FromRGB(255, 0, 0);
+        Sz = 4;
+    }
+    else if(ABattery_mV <= 3600) {
+        Clr.FromRGB(255, 30, 0);
+        Sz = 6;
+    }
+    else if(ABattery_mV <= 3800) {
+        Clr.FromRGB(255, 100, 0);
+        Sz = 8;
+    }
+    else if(ABattery_mV <= 4000) {
+        Clr.FromRGB(255, 255, 0);
+        Sz = 10;
+    }
+    else {
+        Clr.FromRGB(0, 255, 0);
+        Sz = 12;
+    }
+    Blade.DoBatteryIndication(Clr, Sz);
 }
 
 } // namespace
