@@ -9,6 +9,7 @@
 #include "battery_consts.h"
 #include "radio_lvl1.h"
 #include "led.h"
+#include "Sequences.h"
 #endif
 #if 1 // ======================== Variables & prototypes =======================
 // Forever
@@ -55,7 +56,9 @@ int main(void) {
     PinSetupAnalog(ADC_BAT_PIN);
 //    Adc.Init();
 
-//    Radio.Init();
+    // ==== Radio ====
+    if(Radio.Init() == retvOk) Lumos.StartOrRestart(lsqLStart);
+    else Lumos.StartOrRestart(lsqFailure);
 
     TmrOneS.StartOrRestart();
 
