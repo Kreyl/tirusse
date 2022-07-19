@@ -72,7 +72,7 @@
 #define ADC_CLK_DIVIDER		adcDiv2
 
 // ADC channels
-#define ADC_BATTERY_CHNL 	3
+#define ADC_BATTERY_CHNL 	1
 #define ADC_VREFINT_CHNL    17 // const, see RefMan p.161
 #define ADC_CHANNELS        { ADC_BATTERY_CHNL, ADC_VREFINT_CHNL }
 #define ADC_CHANNEL_CNT     2   // Do not use countof(AdcChannels) as preprocessor does not know what is countof => cannot check
@@ -106,7 +106,7 @@
 
 #if 1 // ========================== USART ======================================
 #define PRINTF_FLOAT_EN FALSE
-#define UART_TXBUF_SZ   128
+#define UART_TXBUF_SZ   512
 #define UART_RXBUF_SZ   84
 #define CMD_BUF_SZ      64
 

@@ -8,6 +8,7 @@
 #pragma once
 
 #include <inttypes.h>
+#include "cc1101defins.h"
 
 #define ID_BAD                  (-1)
 #define ID_MIN                  0
@@ -28,7 +29,7 @@ public:
     int32_t ID = ID_MIN;
     uint8_t Type = TYPE_DARKSIDE;
     bool MustTxInEachOther() { return Type != TYPE_OBSERVER; }
-    uint8_t TxPower = 0;
+    uint8_t TxPower = CC_PwrMinus10dBm;
 };
 
 extern Config_t Cfg;

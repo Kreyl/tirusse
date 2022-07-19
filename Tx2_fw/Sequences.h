@@ -65,7 +65,7 @@ const LedRGBChunk_t lsqFailure[] = {
 
 #if 1 // =========================== LED Smooth ================================
 #define LED_TOP_BRIGHTNESS  255
-#define LED_LOW_BRIGHTNESS  36
+#define LED_LOW_BRIGHTNESS  72
 
 const LedSmoothChunk_t lsqLStart[] = {
         {csSetup, 450, LED_TOP_BRIGHTNESS},
@@ -99,7 +99,7 @@ const LedSmoothChunk_t lsqDischarged[] = {
 
 #endif
 
-#if 1 // ============================= Beeper ==================================
+#if 0 // ============================= Beeper ==================================
 #define BEEP_VOLUME     2   // Maximum 10
 
 #if 1 // ==== Notes ====
@@ -188,7 +188,7 @@ const BeepChunk_t bsqBeepPillBad[] = {
 #endif // ext
 #endif // beeper
 
-#if 1 // ============================== Vibro ==================================
+#if 0 // ============================== Vibro ==================================
 #define VIBRO_VOLUME    100  // 1 to 100
 
 #define VIBRO_SHORT_MS          99

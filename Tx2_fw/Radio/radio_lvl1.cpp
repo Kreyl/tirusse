@@ -143,8 +143,7 @@ uint8_t rLevel1_t::Init() {
     if(CC.Init() == retvOk) {
         CC.SetPktSize(RPKT_LEN);
         CC.SetChannel(RCHNL_EACH_OTH);
-//        CC.SetTxPower(Cfg.TxPower);
-        CC.SetTxPower(CC_Pwr0dBm);
+        CC.SetTxPower(Cfg.TxPower);
         Radio.TxPower = Cfg.TxPower;
         CC.SetBitrate(CCBitrate500k);
 

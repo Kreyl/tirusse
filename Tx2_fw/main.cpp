@@ -22,11 +22,12 @@ void OnCmd(Shell_t *PShell);
 void ITask();
 
 LedSmooth_t Lumos { LED_PIN };
+uint8_t GetID();
 #endif
 
 #if 1 // === ADC ===
+#define BATTERY_LOW_mv  3500
 extern Adc_t Adc;
-void OnMeasurementDone();
 TmrKL_t TmrOneS {TIME_MS2I(999), evtIdEverySecond, tktPeriodic};
 
 Config_t Cfg;
@@ -49,15 +50,16 @@ int main(void) {
     // ==== Init hardware ====
     Uart.Init();
     AFIO->MAPR = (0b010UL << 24); // Remap pins: disable JTAG leaving SWD
-    // Power-on, or radio pkt received => proceed with init
-    Printf("\r%S %S\r", APP_NAME, XSTRINGIFY(BUILD_TIME));
+    Cfg.ID = 50 + GetID();
+    Printf("\r%S %S\rID=%u; Type=%u; Pwr=%S\r", APP_NAME, XSTRINGIFY(BUILD_TIME),
+            Cfg.ID, Cfg.Type, CC_PwrToString(Cfg.TxPower));
     Clk.PrintFreqs();
 
     Lumos.Init();
 
     // Battery measurement
     PinSetupAnalog(ADC_BAT_PIN);
-//    Adc.Init();
+    Adc.Init();
 
     // ==== Radio ====
     if(Radio.Init() == retvOk) Lumos.StartOrRestart(lsqLStart);
@@ -82,29 +84,31 @@ void ITask() {
             case evtIdEverySecond:
 //                Printf("Second\r");
                 Iwdg::Reload();
+                Adc.StartMeasurement();
                 break;
 
-            case evtIdAdcRslt: OnMeasurementDone(); break;
+            case evtIdAdcRslt: {
+//                Printf("%u %u\r", Adc.GetResult(0), Adc.GetResult(1));
+                uint32_t Battery_mV = 2 * Adc.Adc2mV(Adc.GetResult(0), Adc.GetResult(1)); // *2 because of resistor divider
+//                Printf("VBat: %umV\r", Battery_mV);
+                if(Battery_mV < BATTERY_LOW_mv) Lumos.StartOrContinue(lsqDischarged);
+            } break;
 
             default: break;
         } // switch
     } // while true
 }
 
-void OnMeasurementDone() {
-//    Printf("%u %u %u\r", Adc.GetResult(0), Adc.GetResult(1), Adc.Adc2mV(Adc.GetResult(0), Adc.GetResult(1)));
-    // Calculate voltage
-    uint32_t VBat = 2 * Adc.Adc2mV(Adc.GetResult(0), Adc.GetResult(1)); // *2 because of resistor divider
-    uint8_t Percent = mV2PercentAlkaline(VBat);
-    Printf("VBat: %umV; Percent: %u\r", VBat, Percent);
-//    ColorHSV_t hsv;
-//    if     (Percent <= 20) hsv = {0,   100, 100};
-//    else if(Percent <  80) hsv = {30,  100, 100};
-//    else                   hsv = {120, 100, 100};
-//    CrystalLeds::SetAllHsv(hsv);
-//    chThdSleepMilliseconds(1530);
-//    if(Sleep::WakeUpOccured()) EnterSleep();
-//    else CrystalLeds::On();
+uint8_t GetID() {
+    uint8_t id = 0;
+    for(uint8_t i=3; i<=9; i++) {
+        id <<= 1;
+        PinSetupInput(GPIOB, i, pudPullUp);
+        chThdSleepMilliseconds(1);
+        if(PinIsLo(GPIOB, i)) id |= 1; // Fuse detected
+        PinSetupAnalog(GPIOB, i);
+    }
+    return id;
 }
 
 #if 1 // ======================= Command processing ============================
