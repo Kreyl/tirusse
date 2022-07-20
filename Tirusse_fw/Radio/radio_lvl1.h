@@ -58,7 +58,7 @@ union rPkt_t {
 #define RCHNL_EACH_OTH      2
 
 #define RX_DURATION_MS      108
-#define SLEEP_DURATION_MS   540
+#define SLEEP_DURATION_MS   630
 
 #endif
 

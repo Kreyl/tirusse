@@ -73,6 +73,11 @@ const LedSmoothChunk_t lsqLStart[] = {
         {csEnd}
 };
 
+const LedSmoothChunk_t lsqIdle[] = {
+        {csSetup, 0, LED_LOW_BRIGHTNESS},
+        {csEnd}
+};
+
 const LedSmoothChunk_t lsqFailure[] = {
         {csSetup, 0, LED_TOP_BRIGHTNESS},
         {csWait, 72},

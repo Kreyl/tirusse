@@ -23,12 +23,12 @@
 
 // Handlers
 extern void ProcessUsbDetect(PinSnsState_t *PState, uint32_t Len);
-extern void ProcessCharging(PinSnsState_t *PState, uint32_t Len);
+//extern void ProcessCharging(PinSnsState_t *PState, uint32_t Len);
 extern void ProcessButtons(PinSnsState_t *PState, uint32_t Len);
 
 const PinSns_t PinSns[] = {
         {USB_DETECT_PIN, pudNone, ProcessUsbDetect},
-        {IS_CHARGING, ProcessCharging},
+//        {IS_CHARGING, pudPullUp, ProcessCharging},
         {BTN_PIN, pudPullDown, ProcessButtons},
 };
 #define PIN_SNS_CNT     countof(PinSns)

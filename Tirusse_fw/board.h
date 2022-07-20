@@ -39,7 +39,7 @@
 #define BTN_PIN         GPIOC, 13
 
 // Battery
-#define IS_CHARGING     GPIOA, 0, pudPullUp
+#define IS_CHARGING     GPIOA, 0
 #define BAT_MEAS_EN     GPIOB, 0
 #define BAT_ADC_PIN     GPIOB, 1, 16 // PB1, ADC channel 16
 

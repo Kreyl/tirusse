@@ -14,6 +14,7 @@ extern Neopixels_t Leds;
 
 void LedPwrOn();
 void LedPwrOff();
+bool IsLedPwrOn();
 
 #define LED_CNT     NPX_LED_CNT
 
@@ -23,10 +24,10 @@ class ParentEff_t {
 private:
     virtual_timer_t Tmr;
 protected:
-    void StartTimerI(systime_t Delay_st) { chVTSetI(&Tmr, Delay_st, TmrCallbackUpdate, this); }
-    void StartTimer(systime_t Delay) {
+    void StartTimerI(uint32_t Delay_ms) { chVTSetI(&Tmr, TIME_MS2I(Delay_ms), TmrCallbackUpdate, this); }
+    void StartTimer(uint32_t Delay_ms) {
         chSysLock();
-        StartTimerI(Delay);
+        StartTimerI(Delay_ms);
         chSysUnlock();
     }
     bool TimerIsStarted() { return chVTIsArmed(&Tmr); }
@@ -41,7 +42,6 @@ public:
 // Universal Updating callback
 static void TmrCallbackUpdate(void *p) {
     chSysLockFromISR();
-//    PrintfI("i");
     ((ParentEff_t*)p)->UpdateI();
     chSysUnlockFromISR();
 }
@@ -68,7 +68,7 @@ public:
                 break;
 
             case staIndicateBattery:
-                if(!TimerIsStarted()) StartTimer(TIME_MS2I(BATTERY_INDICATION_DURATION_MS));
+                if(!TimerIsStarted()) StartTimer(BATTERY_INDICATION_DURATION_MS);
                 for(uint32_t i=1; i<(LED_CNT/2); i++) {
                     Leds.ClrBuf[i] = (i <= Sz)? ClrBattery : clBlack;
                     Leds.ClrBuf[LED_CNT - i - 1] = Leds.ClrBuf[i];
@@ -97,15 +97,48 @@ public:
 class Gem_t : public ParentEff_t {
 private:
     Color_t ClrCurr = clBlack;
+    enum State_t {staIdle, staBlinkFadeIn, staBlinkOn, staBlinkFadeOut} State;
+    uint32_t BlinkOnDuration_ms;
 public:
     Color_t ClrTarget = clBlack;
     uint32_t Smooth = 0;
-    void UpdateI() override { ClrCurr.Adjust(ClrTarget); }
+
+    void UpdateI() override {
+        if(State == staBlinkOn) {
+            State = staBlinkFadeOut;
+            ClrTarget = clBlack;
+        }
+        else ClrCurr.Adjust(ClrTarget);
+    }
+
     void Draw() {
-        if(ClrCurr != ClrTarget and !TimerIsStarted()) StartTimer(ClrCurr.DelayToNextAdj(ClrTarget, Smooth));
         Leds.ClrBuf[0] = ClrCurr;
         Leds.ClrBuf[LED_CNT-1] = ClrCurr;
+        if(ClrCurr == ClrTarget) {
+            switch(State) {
+                case staBlinkFadeIn:
+                    StartTimer(BlinkOnDuration_ms);
+                    State = staBlinkOn;
+                    break;
+                case staBlinkFadeOut: State = staIdle; break;
+                default: break;
+            }
+        }
+        else if(!TimerIsStarted()) StartTimer(ClrCurr.DelayToNextAdj(ClrTarget, Smooth));
     }
+
+    void DoBlink(Color_t Clr, uint32_t ASmooth, uint32_t OnDuration_ms) {
+        chSysLock();
+        State = staBlinkFadeIn;
+        ClrTarget = Clr;
+        Smooth = ASmooth;
+        BlinkOnDuration_ms = OnDuration_ms;
+        ClrCurr = clBlack;
+        StartTimerI(ClrCurr.DelayToNextAdj(ClrTarget, Smooth));
+        chSysUnlock();
+    }
+
+    bool IsIdle() { return State == staIdle and ClrCurr == clBlack; }
 };
 
 static Blade_t Blade;
@@ -191,6 +224,17 @@ void StartBatteryIndication(uint32_t ABattery_mV) {
         Sz = 12;
     }
     Blade.DoBatteryIndication(Clr, Sz);
+}
+
+void BlinkGem(Color_t Clr, uint32_t ASmooth, uint32_t OnDuration_ms) {
+    Gem.DoBlink(Clr, ASmooth, OnDuration_ms);
+}
+
+void WaitLedsOff() {
+    while(!Gem.IsIdle()) {
+        Iwdg::Reload();
+        chThdSleepMilliseconds(9);
+    }
 }
 
 } // namespace

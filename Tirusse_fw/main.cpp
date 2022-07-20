@@ -60,6 +60,8 @@ const AdcSetup_t AdcSetup = {
 
 static void EnterSleepNow();
 static void EnterSleep();
+static inline bool BtnIsPressed() { return PinIsHi(BTN_PIN); }
+static inline bool IsCharging() { return PinIsLo(IS_CHARGING); }
 #endif
 
 #if 1 // ========================== Logic ======================================
@@ -72,7 +74,7 @@ static void EnterSleep();
 
 #define TYPE_CNT                4
 
-#define SMOOTH_VALUE            4500
+#define SMOOTH_VALUE            450
 #define CLR_INDI                Color_t(0, 0, 108)
 
 static TmrKL_t TmrCheckRxTable {TIME_MS2I(1800), evtIdCheckRxTable, tktPeriodic};
@@ -98,12 +100,12 @@ void CheckRxTable() {
 int main(void) {
 #if 1 // ==== Get source of wakeup ====
     rccEnablePWRInterface(FALSE);
+    PinSetupInput(BTN_PIN, pudPullDown); // Always, to allow BtnPress waiting
     if(Sleep::WokeUpByWKUP2()) { // Wakeup by button occured
         // Wait longpress
-        PinSetupInput(BTN_PIN, pudPullDown);
         for(uint32_t i=0; i<540000; i++) {
             // Go sleep if btn released too fast
-            if(PinIsLo(BTN_PIN)) EnterSleepNow();
+            if(!BtnIsPressed()) EnterSleepNow();
         }
         // Btn was keeped in pressed state long enough, proceed with powerOn
     }
@@ -156,19 +158,6 @@ int main(void) {
     Clk.PrintFreqs();
     if(Clk.IsHseOn()) Printf("Quartz ok\r\n");
 
-    Lumos.Init();
-
-    // Leds
-    Leds.Init();
-    PinSetupOut(NPX_PWR_PIN, omPushPull); // LED pwr pin
-//    LedPwrOn();
-//    Leds.SetAll(clBlue);
-//    Leds.SetCurrentColors();
-    Eff::Init();
-
-//    UsbMsd.Init();
-    SimpleSensors::Init();
-
     // Battery measurement
     PinSetupOut(BAT_MEAS_EN, omPushPull);
     PinSetHi(BAT_MEAS_EN); // Enable it forever, as 200k produces ignorable current
@@ -176,10 +165,30 @@ int main(void) {
     Adc.Init(AdcSetup);
     Adc.StartPeriodicMeasurement(1);
 
+    // === Leds ===
+    Lumos.Init();
+    Leds.Init();
+    PinSetupOut(NPX_PWR_PIN, omPushPull); // LED pwr pin
+    Eff::Init();
+    // Show pwrOn
+    Lumos.StartOrRestart(lsqIdle);
+    Eff::BlinkGem(clGreen, 360, 450);
+    Eff::WaitLedsOff();
+    while(BtnIsPressed()) {
+        Iwdg::Reload();
+        chThdSleepMilliseconds(4);
+    }
+
     // Radio
-    if(Radio.Init() == retvOk) Lumos.StartOrRestart(lsqLStart);
-    else Lumos.StartOrRestart(lsqFailure);
+    if(Radio.Init() != retvOk) {
+        Lumos.StartOrRestart(lsqFailure);
+        chThdSleepMilliseconds(999);
+    }
     TmrCheckRxTable.StartOrRestart();
+
+//    UsbMsd.Init();
+    SimpleSensors::Init();
+    PinSetupInput(IS_CHARGING, pudPullUp);
 
     // Main cycle
     ITask();
@@ -194,11 +203,19 @@ void ITask() {
                 Iwdg::Reload();
                 Battery_mV = 2 * Adc.Adc2mV(Msg.Values16[0], Msg.Values16[1]); // *2 because of resistor divider
 //                Printf("VBat: %u mV\r", Battery_mV);
-                if(Battery_mV < BATTERY_DEAD_mv) {
-                    Printf("Discharged: %u\r", Battery_mV);
-                    EnterSleep();
+                // Process charging
+                if(IsCharging()) {
+                    Eff::StartBatteryIndication(Battery_mV); // Display battery during charge
+                    Lumos.StartOrContinue(lsqLCharging);
                 }
-                else if(Battery_mV < BATTERY_LOW_mv) Lumos.StartOrContinue(lsqDischarged);
+                else {
+                    if(Battery_mV < BATTERY_DEAD_mv and !UsbIsConnected) {
+                        Printf("Discharged: %u\r", Battery_mV);
+                        EnterSleep();
+                    }
+                    else if(Battery_mV < BATTERY_LOW_mv) Lumos.StartOrContinue(lsqDischarged);
+                    else if(!Lumos.IsIdle()) Lumos.StartOrRestart(lsqIdle);
+                }
                 break;
 
             case evtIdCheckRxTable: CheckRxTable(); break;
@@ -244,15 +261,15 @@ void ProcessUsbDetect(PinSnsState_t *PState, uint32_t Len) {
     }
 }
 
-void ProcessCharging(PinSnsState_t *PState, uint32_t Len) {
-    if(*PState == pssLo) {
-        Lumos.StartOrContinue(lsqLCharging);
-    }
-    else if(*PState == pssRising) { // Charge stopped
-        Lumos.StartOrContinue(lsqLStart);
-    }
-//    else if(*PState == pssHi) LedPwrOn();
-}
+//void ProcessCharging(PinSnsState_t *PState, uint32_t Len) {
+//    if(*PState == pssLo) {
+//        Lumos.StartOrContinue(lsqLCharging);
+//    }
+//    else if(*PState == pssRising) { // Charge stopped
+//        Lumos.StartOrContinue(lsqLStart);
+//    }
+////    else if(*PState == pssHi) LedPwrOn();
+//}
 
 void OnAdcDoneI() {
     AdcBuf_t &FBuf = Adc.GetBuf();
@@ -281,7 +298,9 @@ void EnterSleepNow() {
 void EnterSleep() {
     Printf("Entering sleep\r");
     Radio.Stop();
-    chThdSleepMilliseconds(45);
+    Eff::SetBlade(clBlack, 180);
+    Eff::BlinkGem(clBlue, 360, 450);
+    Eff::WaitLedsOff();
     chSysLock();
     EnterSleepNow();
     chSysUnlock();
