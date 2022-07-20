@@ -14,7 +14,6 @@ extern Neopixels_t Leds;
 
 void LedPwrOn();
 void LedPwrOff();
-bool IsLedPwrOn();
 
 #define LED_CNT     NPX_LED_CNT
 
@@ -96,20 +95,14 @@ public:
 
 class Gem_t : public ParentEff_t {
 private:
-    Color_t ClrCurr = clBlack;
-    enum State_t {staIdle, staBlinkFadeIn, staBlinkOn, staBlinkFadeOut} State;
-    uint32_t BlinkOnDuration_ms;
+    Color_t ClrCurr = clBlack, ClrBlink = clBlack;
+    enum State_t {staIdle, staBlinkFadeIn, staBlinkFadeOut} State;
+    bool BlinkForever = false;
 public:
     Color_t ClrTarget = clBlack;
     uint32_t Smooth = 0;
 
-    void UpdateI() override {
-        if(State == staBlinkOn) {
-            State = staBlinkFadeOut;
-            ClrTarget = clBlack;
-        }
-        else ClrCurr.Adjust(ClrTarget);
-    }
+    void UpdateI() override { ClrCurr.Adjust(ClrTarget); }
 
     void Draw() {
         Leds.ClrBuf[0] = ClrCurr;
@@ -117,24 +110,54 @@ public:
         if(ClrCurr == ClrTarget) {
             switch(State) {
                 case staBlinkFadeIn:
-                    StartTimer(BlinkOnDuration_ms);
-                    State = staBlinkOn;
+                    State = staBlinkFadeOut;
+                    ClrTarget = clBlack;
                     break;
-                case staBlinkFadeOut: State = staIdle; break;
+                case staBlinkFadeOut:
+                    State = BlinkForever? staBlinkFadeIn : staIdle;
+                    ClrTarget = ClrBlink;
+                    break;
                 default: break;
             }
         }
         else if(!TimerIsStarted()) StartTimer(ClrCurr.DelayToNextAdj(ClrTarget, Smooth));
     }
 
-    void DoBlink(Color_t Clr, uint32_t ASmooth, uint32_t OnDuration_ms) {
+    void BlinkForeverOrContinue(Color_t Clr, uint32_t ASmooth) {
         chSysLock();
+        if(State == staIdle) {
+            State = staBlinkFadeIn;
+            ClrTarget = Clr;
+            Smooth = ASmooth;
+            ClrCurr = clBlack;
+            StartTimerI(ClrCurr.DelayToNextAdj(ClrTarget, Smooth));
+        }
+        ClrBlink = Clr;
+        BlinkForever = true;
+        chSysUnlock();
+    }
+
+    void BlinkOnce(Color_t Clr, uint32_t ASmooth) {
+        chSysLock();
+        StopTimerI();
         State = staBlinkFadeIn;
         ClrTarget = Clr;
         Smooth = ASmooth;
-        BlinkOnDuration_ms = OnDuration_ms;
         ClrCurr = clBlack;
+        ClrBlink = clBlack;
+        BlinkForever = false;
         StartTimerI(ClrCurr.DelayToNextAdj(ClrTarget, Smooth));
+        chSysUnlock();
+    }
+
+    void Set(Color_t Clr, uint32_t ASmooth) {
+        chSysLock();
+        if(State != staIdle) {
+            StopTimerI();
+            State = staIdle;
+        }
+        ClrTarget = Clr;
+        Smooth = ASmooth;
         chSysUnlock();
     }
 
@@ -184,11 +207,6 @@ void Init() {
     chThdCreateStatic(waNpxThread, sizeof(waNpxThread), NORMALPRIO, (tfunc_t)NpxThread, NULL);
 }
 
-void SetGem(Color_t Clr, uint32_t ASmooth) {
-    Gem.ClrTarget = Clr;
-    Gem.Smooth = ASmooth;
-}
-
 void SetBlade(Color_t Clr, uint32_t ASmooth) {
     Blade.ClrTarget = Clr;
     Blade.Smooth = ASmooth;
@@ -226,9 +244,11 @@ void StartBatteryIndication(uint32_t ABattery_mV) {
     Blade.DoBatteryIndication(Clr, Sz);
 }
 
-void BlinkGem(Color_t Clr, uint32_t ASmooth, uint32_t OnDuration_ms) {
-    Gem.DoBlink(Clr, ASmooth, OnDuration_ms);
-}
+
+void SetGem(Color_t Clr, uint32_t ASmooth) { Gem.Set(Clr, ASmooth); }
+void GemBlinkOnce(Color_t Clr, uint32_t ASmooth) { Gem.BlinkOnce(Clr, ASmooth); }
+void GemBlinkForeverOrContinue(Color_t Clr, uint32_t ASmooth) { Gem.BlinkForeverOrContinue(Clr, ASmooth); }
+bool GemIsIdle() { return Gem.IsIdle(); }
 
 void WaitLedsOff() {
     while(!Gem.IsIdle()) {

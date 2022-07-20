@@ -65,6 +65,45 @@ static inline bool IsCharging() { return PinIsLo(IS_CHARGING); }
 #endif
 
 #if 1 // ========================== Logic ======================================
+// Indication
+#define SMOOTH_VALUE            450
+#define CLR_INDI                Color_t(0, 0, 108)
+
+class Indication_t {
+    bool SomeoneIsNear, UsbConnected, IsCharging, IsDischarged;
+    void Process() {
+        // ==== Blade ====
+        // Blade is on only if someone near anf USB disconnected
+        if(SomeoneIsNear and !UsbConnected and !IsCharging) Eff::SetBlade(CLR_INDI, SMOOTH_VALUE);
+        else Eff::SetBlade(clBlack, SMOOTH_VALUE);
+        // ==== Gem ====
+        // Blue if someone near anf USB disconnected
+        if(SomeoneIsNear and !UsbConnected and !IsCharging) Eff::SetGem(clBlue, SMOOTH_VALUE);
+        // Steady green if USB connected and not charging
+        else if(UsbConnected and !IsCharging) Eff::SetGem(clGreen, SMOOTH_VALUE);
+        // Blink if charging
+        else if(UsbConnected and IsCharging) Eff::GemBlinkForeverOrContinue(clGreen, 180);
+        // Otherwise off
+        else Eff::SetGem(clBlack, SMOOTH_VALUE);
+        // ==== Lumos ====
+        if(IsCharging) Lumos.StartOrContinue(lsqLCharging);
+        else if(IsDischarged) Lumos.StartOrContinue(lsqDischarged);
+        else { if(!Lumos.IsIdle()) Lumos.StartOrContinue(lsqIdle); }
+    }
+public:
+    void OnRadio(bool ASomeoneIsNear) {
+        SomeoneIsNear = ASomeoneIsNear;
+        Process();
+    }
+
+    void OnPwr(bool AUsbConnected, bool AIsCharging, bool AIsDischarged) {
+        UsbConnected = AUsbConnected;
+        IsCharging = AIsCharging;
+        IsDischarged = AIsDischarged;
+        Process();
+    }
+} Indication;
+
 // === Types ===
 #define TYPE_OBSERVER           0
 #define TYPE_NOTHING            0 // What to show
@@ -74,9 +113,6 @@ static inline bool IsCharging() { return PinIsLo(IS_CHARGING); }
 
 #define TYPE_CNT                4
 
-#define SMOOTH_VALUE            450
-#define CLR_INDI                Color_t(0, 0, 108)
-
 static TmrKL_t TmrCheckRxTable {TIME_MS2I(1800), evtIdCheckRxTable, tktPeriodic};
 
 void CheckRxTable() {
@@ -85,15 +121,7 @@ void CheckRxTable() {
     RxTable_t *Tbl = Radio.GetRxTable();
     Tbl->ProcessCountingDistinctTypes(TypesCnt, TYPE_CNT);
     uint32_t Cnt = TypesCnt[TYPE_DARKSIDE] + TypesCnt[TYPE_BOTH];
-    // Fade blade if USB connected or nobody around
-    if(Cnt == 0 or UsbIsConnected) {
-        Eff::SetBlade(clBlack,  SMOOTH_VALUE);
-        Eff::SetGem(clBlack, SMOOTH_VALUE);
-    }
-    else {
-        Eff::SetBlade(CLR_INDI, SMOOTH_VALUE);
-        Eff::SetGem(clBlue, SMOOTH_VALUE);
-    }
+    Indication.OnRadio(Cnt != 0);
 }
 #endif
 
@@ -172,7 +200,7 @@ int main(void) {
     Eff::Init();
     // Show pwrOn
     Lumos.StartOrRestart(lsqIdle);
-    Eff::BlinkGem(clGreen, 360, 450);
+    Eff::GemBlinkOnce(clGreen, 180);
     Eff::WaitLedsOff();
     while(BtnIsPressed()) {
         Iwdg::Reload();
@@ -203,18 +231,10 @@ void ITask() {
                 Iwdg::Reload();
                 Battery_mV = 2 * Adc.Adc2mV(Msg.Values16[0], Msg.Values16[1]); // *2 because of resistor divider
 //                Printf("VBat: %u mV\r", Battery_mV);
-                // Process charging
-                if(IsCharging()) {
-                    Eff::StartBatteryIndication(Battery_mV); // Display battery during charge
-                    Lumos.StartOrContinue(lsqLCharging);
-                }
-                else {
-                    if(Battery_mV < BATTERY_DEAD_mv and !UsbIsConnected) {
-                        Printf("Discharged: %u\r", Battery_mV);
-                        EnterSleep();
-                    }
-                    else if(Battery_mV < BATTERY_LOW_mv) Lumos.StartOrContinue(lsqDischarged);
-                    else if(!Lumos.IsIdle()) Lumos.StartOrRestart(lsqIdle);
+                Indication.OnPwr(UsbIsConnected, IsCharging(), (Battery_mV < BATTERY_LOW_mv));
+                if(!IsCharging() and !UsbIsConnected and Battery_mV < BATTERY_DEAD_mv) {
+                    Printf("Discharged: %u\r", Battery_mV);
+                    EnterSleep();
                 }
                 break;
 
@@ -261,16 +281,6 @@ void ProcessUsbDetect(PinSnsState_t *PState, uint32_t Len) {
     }
 }
 
-//void ProcessCharging(PinSnsState_t *PState, uint32_t Len) {
-//    if(*PState == pssLo) {
-//        Lumos.StartOrContinue(lsqLCharging);
-//    }
-//    else if(*PState == pssRising) { // Charge stopped
-//        Lumos.StartOrContinue(lsqLStart);
-//    }
-////    else if(*PState == pssHi) LedPwrOn();
-//}
-
 void OnAdcDoneI() {
     AdcBuf_t &FBuf = Adc.GetBuf();
     EvtMsg_t Msg(evtIdADC);
@@ -299,7 +309,7 @@ void EnterSleep() {
     Printf("Entering sleep\r");
     Radio.Stop();
     Eff::SetBlade(clBlack, 180);
-    Eff::BlinkGem(clBlue, 360, 450);
+    Eff::GemBlinkOnce(clBlue, 180);
     Eff::WaitLedsOff();
     chSysLock();
     EnterSleepNow();

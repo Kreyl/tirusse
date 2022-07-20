@@ -14,11 +14,13 @@
 namespace Eff {
 void Init();
 
-void SetGem(Color_t Clr, uint32_t ASmooth);
 void SetBlade(Color_t Clr, uint32_t ASmooth);
 void StartBatteryIndication(uint32_t ABattery_mV);
 
-void BlinkGem(Color_t Clr, uint32_t ASmooth, uint32_t OnDuration_ms);
+void SetGem(Color_t Clr, uint32_t ASmooth);
+void GemBlinkOnce(Color_t Clr, uint32_t ASmooth);
+void GemBlinkForeverOrContinue(Color_t Clr, uint32_t ASmooth);
+bool GemIsIdle();
 
 void WaitLedsOff();
 
