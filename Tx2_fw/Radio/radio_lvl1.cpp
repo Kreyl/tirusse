@@ -82,8 +82,8 @@ static void RxCallback() {
 
 // After TX done, enter either RX in cycle 0 or Sleep in other case
 static void TxCallback() {
-    DBG1_CLR();
     if(IsInZeroCycle()) CC.ReceiveAsyncI(RxCallback);
+    DBG1_CLR();
 }
 
 // ============================ Timing IRQ handlers ============================
@@ -108,10 +108,11 @@ static void IOnNewSupercycleI() {
 // Will be here if IRQ is enabled, which is determined at end of supercycle
 static void IOnTxSlotI() {
     DBG1_SET();
+    CC.Recalibrate();
     PktTx.TimeSrc = TimeSrc;
     PktTx.HopCnt = HopCnt;
     PktTx.iTime = IHwTmr.GetCounter();
-    CC.TransmitAsyncX((uint8_t*)&PktTx, RPKT_LEN, TxCallback);
+    CC.TransmitCcaX((uint8_t*)&PktTx, RPKT_LEN, TxCallback);
     PrepareNextTx();
 }
 

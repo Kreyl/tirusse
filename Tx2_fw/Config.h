@@ -29,7 +29,7 @@ public:
     int32_t ID = ID_MIN;
     uint8_t Type = TYPE_DARKSIDE;
     bool MustTxInEachOther() { return Type != TYPE_OBSERVER; }
-    uint8_t TxPower = CC_PwrMinus10dBm;
+    uint8_t TxPower = CC_PwrPlus7dBm;
 };
 
 extern Config_t Cfg;
